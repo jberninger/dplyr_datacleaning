@@ -1,0 +1,54 @@
+library(readr)
+library(dplyr)
+library(data.table)
+library(DT)
+# I am leaving out the setwd() call for the sake of security
+data <- read_csv("CSV_election_data/1986g.csv")
+## 1986 Proposition U voting
+## we want to have the voting breakdown by precinct
+## LA county, all cities
+# include CENSUS.TRACT.INFORMATION.FILLER data
+# include registration data (number of registered voters), county supervisorial district, precinct number, US congressional district, community code
+# make it a datatable
+# in the vote by mail
+# mutate the voting percentages (off different denominators if they exist)
+# filter for counter.number 471 (yes) and 472 (no)
+# check for ballot groups
+
+dat <- data %>% dplyr::select("precinct" = 1, "nonpartisan" = 6, "democrat" = 7, "republican" = 8, "independent" = 9, "green" = 10,
+                              "libertarian" = 11, "total_registration" = 12, "congress_district" = 13, 
+                              "county_supervisor_district" = 16, "census_tract_1990" = 73, "prop_u_no" = 342, "prop_u_yes" = 343) %>% 
+                        mutate(total_registration = as.numeric(total_registration), nonpartisan = as.numeric(nonpartisan), 
+                               democrat = as.numeric(democrat), republican = as.numeric(republican), independent= as.numeric(independent),
+                               green = as.numeric(green), libertarian = as.numeric(libertarian)) %>% 
+                        na.omit() %>%
+                        mutate(prop_u_yes = as.numeric(prop_u_yes), prop_u_no = as.numeric(prop_u_no)) %>%
+                        mutate(prop_u_yes_percent = (prop_u_yes/total_registration) , prop_u_no_percent = (prop_u_no/total_registration))
+# Exploratory data analysis below, just checking some things to make sure they align with my expectations
+
+dat %>% filter(total_registration > (prop_u_yes + prop_u_no))
+# 2458
+
+dat %>% filter(total_registration > 0)
+# 2460
+
+dat %>% filter(total_registration == (nonpartisan + democrat + republican + independent + green + libertarian))
+# 2578
+
+dat %>% filter(total_registration < (prop_u_yes + prop_u_no)) %>% datatable()
+# the datatable() boject gives a nice scrolling view, its good for rmd presentations
+
+###### All the precincts that have some wonkiness in the number start with 999 as their precinct number
+prop_u <- data %>% dplyr::select("precinct" = 1, "community" = 5, "total_registration" = 12, "congress_district" = 13, 
+                              "county_supervisor_district" = 16, "census_tract_1990" = 73, "prop_u_no" = 342, "prop_u_yes" = 343) %>% 
+  mutate(total_registration = as.numeric(total_registration)) %>% 
+  na.omit() %>% filter(!grepl("999", precinct)) %>% 
+  mutate(prop_u_yes = as.numeric(prop_u_yes), prop_u_no = as.numeric(prop_u_no), prop_u_didnt_vote = total_registration - prop_u_yes - prop_u_no) %>%
+  mutate(prop_u_no_percent = (prop_u_no/total_registration), prop_u_yes_percent = (prop_u_yes/total_registration) ,  prop_u_didnt_vote_percent = (prop_u_didnt_vote/total_registration))
+
+prop_u %>% View()
+# I liie to use View() before I write any csv or file out
+prop_u %>% datatable()
+# again, datatable is a good object for presentations
+
+write_csv(prop_u, path = "prop_u_1986_precincts.csv")
